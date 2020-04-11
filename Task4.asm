@@ -2,6 +2,7 @@
 .stack 100h
 .data
 game_over db "GAME OVER", '$'
+start_game db "CHOOSE LEVEL",'$'
 yellow equ 14
 green equ 10
 red equ 4
@@ -12,13 +13,32 @@ right_border db 120
 shift_border_to_left dw 0
 number_of_border_shifts db 5
 car_current_position dw 3760
-difference_time db 5
-time db 0
 left db 1
 right db 0
-random_counter db 15
 left_or_right db 0
 .code
+
+
+string_output macro string, len, place
+	mov ax,0003h
+	int 10h
+	
+	mov bx,place
+	mov cx,len
+	mov si,0
+
+cycle_game_over:	
+	
+	mov al,string[si]
+	mov es:[bx], al
+	mov al,red
+	mov es:[bx+1],al
+	inc si
+	add bx,2
+	loop cycle_game_over
+
+endm
+
 
 start:
 	;получить доступ к видеопамяти
@@ -64,6 +84,12 @@ scroll_cycle:
     int 21h 	
 
 
+game_start proc
+	
+	
+	ret
+	game_start endp
+
 draw_car proc
 
 	mov al,green
@@ -81,7 +107,8 @@ draw_car proc
 	
 end_game:
 	call delay
-	call game_over_proc
+	;call game_over_proc
+	string_output game_over,9,1990
 		
 	mov ah,4ch
     int 21h 
@@ -178,7 +205,6 @@ random proc
 	;остаток в ah
 	
 	
-	
 	cmp ah,left_border
 	jg not_shift_obstacle
 	add ah,left_border
@@ -250,10 +276,6 @@ scroll proc
 	pop dx 
 	pop ax 
 	pop cx
-	;call create_obstacles
-	;pop dx
-	
-	;call get_key
 	
 ret
 scroll endp
@@ -279,26 +301,26 @@ flush:
 ret
 get_key endp	
 
-game_over_proc proc
-	mov ax,0003h
-	int 10h
+; game_over_proc proc
+	; mov ax,0003h
+	; int 10h
 	
-	mov bx,1990
-	mov cx,9
-	mov si,0
+	; mov bx,1990
+	; mov cx,9
+	; mov si,0
 
-cycle_game_over:	
+; cycle_game_over:	
 	
-	mov al,game_over[si]
-	mov es:[bx], al
-	mov al,red
-	mov es:[bx+1],al
-	inc si
-	add bx,2
-	loop cycle_game_over
+	; mov al,game_over[si]
+	; mov es:[bx], al
+	; mov al,red
+	; mov es:[bx+1],al
+	; inc si
+	; add bx,2
+	; loop cycle_game_over
 
-	ret 
-game_over_proc endp
+	; ret 
+; game_over_proc endp
 
 draw_border proc
 	push bx 
@@ -331,21 +353,22 @@ shift_border proc
 	cmp cl,80
 	je set_shift
 	jmp end_shift_proc
-	; dec random_counter
-	; cmp random_counter,0
-	; je go_straight
-	; jmp end_shift_proc
 	
 	
 try_left:
+	mov cl,left_border
+	shr cl,2
+	and cl,1
+	
 	cmp left,1
 	jne try_right
 	cmp left_border,0
-	jl end_shift_proc
+	je end_left
 	sub left_border,2
 	sub right_border,2
 	dec number_of_border_shifts
-	mov left_or_right,1
+	
+	mov left_or_right,cl
 	jmp end_shift_proc
 
 
@@ -353,16 +376,15 @@ try_right:
 	cmp right,1
 	jne end_shift_proc
 	cmp right_border,158
-	jg end_shift_proc
+	ja end_right
 	add left_border,2
 	add right_border,2
 	dec number_of_border_shifts
-	mov left_or_right,0
+	mov left_or_right,cl
 	jmp end_shift_proc
 
 	
 set_shift:
-	;mov random_counter,15
 	mov ah,0
 	int 1ah
 	xor dh,dh
@@ -371,14 +393,20 @@ set_shift:
 	cmp left_or_right,1
 	jne set_left
 
-	
+
 	mov right,1
 	jmp end_shift_proc
 	
 set_left:
 	mov left,1
+	jmp end_shift_proc
 
-
+end_left:
+	mov right,1
+	jmp end_of_screen
+	
+end_right:
+	mov left,1
 end_of_screen:
 	mov number_of_border_shifts,0
 	

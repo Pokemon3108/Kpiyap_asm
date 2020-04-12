@@ -3,7 +3,6 @@
 .stack 100h
 
 .data
-
 game_over db "GAME OVER", '$'
 start_game db "CHOOSE LEVEL",'$'
 level_1 db "1-EASY",'$'
@@ -15,6 +14,10 @@ yellow equ 14
 green equ 10
 red equ 4
 white equ 15
+real_seconds db 0   
+seconds db 0
+minutes db 0
+hours db 0
 rand db 179
 left_border dw 40
 right_border dw 120
@@ -26,6 +29,7 @@ right db 0
 left_or_right db 0
 seed dw 0
 seed2 dw 0
+position dw 0	
 
 .code
 
@@ -65,6 +69,15 @@ set_cursor macro row,column,page_number
 	
 endm
 
+output_symbol macro position,color
+    push ax
+    mov bx,position
+    mov es:[bx],al
+	mov al,color
+    mov es:[bx+1],al
+    pop ax 
+endm
+
 start:
 	;получить доступ к видеопамяти
 	push 0b800h
@@ -87,7 +100,8 @@ start:
 	output_string level_4,6,18,37,green
 	;set_cursor 20,40,0
 	call choose_level
-
+	
+	
 	mov cx,25
 pre_game_borders:
 	
@@ -96,10 +110,13 @@ pre_game_borders:
 	
 	loop pre_game_borders
 	
+	mov ah,2ch
+    int 21h
+    mov real_seconds,dh
 	
 scroll_cycle:
-
 	call scroll
+	call set_time
 	call create_obstacles
 	call draw_border
 	call get_key
@@ -109,13 +126,23 @@ scroll_cycle:
 	xor ch,ch
 	mov cl,4
 	sub cl,level
-	;mov cl, 4-level
 	delay_cycle:
 	call delay
 	loop delay_cycle
+	
 	mov bx,car_current_position
 	mov es:[bx],0
 	mov es:[bx+1],0
+	
+	
+	mov bx,0
+	mov cx,8
+delete_time:
+	mov es:[bx],0
+	mov es:[bx+1],0
+	add bx,2
+	loop delete_time
+	
 	
 	jmp scroll_cycle
 	
@@ -147,21 +174,12 @@ ret
 game_start endp
 
 draw_car proc
-	;push ax
-	;push bx
+	
 	mov al,green
 	mov bx, car_current_position
 	mov es:[bx],65
 	mov es:[bx+1],al
-	
-	; xor dx,dx
-	; mov bx,160
-	; div bx
-	; cmp dx,left_border
-	; jb end_game
-	; cmp dx,right_border
-	; ja end_game
-	
+
 	mov bx,car_current_position
 	sub bx,160
     
@@ -174,12 +192,10 @@ draw_car proc
 	je end_game
 	cmp es:[bx-2],al
 	je end_game
-	;pop bx
-	;pop ax
+	
 	ret
 	
 end_game:
-	
 	
 	mov ax,0003h
 	int 10h
@@ -189,13 +205,13 @@ end_game:
 	output_string level_3,6,16,37,green
 	output_string level_4,6,18,37,green
 	call delay
-	;set_cursor 20,40,0
 	call choose_level
 	mov left_border,40
 	mov right_border,120
 	mov car_current_position,3760
-	;pop bx
-	;pop ax
+	mov hours,0
+	mov minutes,0
+	mov seconds,0
 	mov cx,25
 	jmp pre_game_borders
 	ret
@@ -391,8 +407,6 @@ random endp
 
 
 scroll proc
-	;push dx
-	;scroll
 	push cx 
 	push ax 
 	push dx 
@@ -426,9 +440,6 @@ go_left:
 	sub car_current_position,2
 
 flush:	
-	;очистка буфера клавиатуры
-	;mov ah, 0ch 
-    ;int 21h 
 	call clear_keyboard_buffer
 	
 ret
@@ -505,7 +516,6 @@ set_shift:
 	xor dh,dh
 	shr dl,5
 	mov number_of_border_shifts,dl	
-	;cmp left,1
 	
 	cmp left_or_right,1
 	jne set_left
@@ -541,8 +551,6 @@ shift_border endp
 choose_level proc
 	push ax
 	
-	;mov ah, 0ch 
-   ; int 21h
 input:  
    call clear_keyboard_buffer
    
@@ -570,8 +578,6 @@ input:
 end_choose_level:
 	mov ax,0003h
 	int 10h
-	;mov ah, 0ch 
-    ;int 21h
 	call clear_keyboard_buffer
 	pop ax
 ret
@@ -579,10 +585,114 @@ choose_level endp
 
 clear_keyboard_buffer proc 
     push ax
-   mov ah, 0ch 
+    mov ah, 0ch 
     int 21h
     pop ax
     ret
 clear_keyboard_buffer endp
 
+set_time proc
+	push ax
+	push bx
+	push cx
+	push dx
+
+    mov position,0  
+	call output_all_time
+	
+    mov ah,2ch
+    int 21h
+    cmp real_seconds,dh
+    je end_time
+   
+change_seconds:
+	mov real_seconds,dh
+    inc seconds
+    cmp seconds,60
+	jne end_time
+	
+second_60:  
+    mov seconds,0
+    
+change_minutes:    
+    inc minutes
+	
+    cmp minutes,60  
+    jne end_time 
+	
+minutes_60:
+    mov minutes,0 
+
+change_hours:
+    inc hours
+
+end_time:    	
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	ret
+set_time endp
+
+output_all_time proc
+    mov al,hours
+    call output_part
+    mov al,':'
+    output_symbol position,green
+    add position,2
+    mov al,minutes
+    call output_part
+    mov al,':'
+    output_symbol position,green 
+    add position,2
+    mov al,seconds
+    call output_part
+    ret
+output_all_time endp 
+
+
+output_part proc 
+    xor ah,ah
+    xor dh,dh   
+    mov dl,10
+    div dl
+    
+    add al,48 
+    output_symbol position,green
+    add position,2
+    
+    add ah,48
+    xchg al,ah  
+    output_symbol position,green
+    add position,2
+     
+    ret
+output_part endp
+
 end start
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

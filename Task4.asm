@@ -1,8 +1,9 @@
 .model small 
-.386
+;.386
 .stack 100h
 
 .data
+instruction db "-> right    <- left",'$'
 game_over db "GAME OVER", '$'
 start_game db "CHOOSE LEVEL",'$'
 level_1 db "1-EASY",'$'
@@ -27,8 +28,6 @@ car_current_position dw 3760
 left db 1
 right db 0
 left_or_right db 0
-seed dw 0
-seed2 dw 0
 position dw 0	
 
 .code
@@ -90,6 +89,7 @@ start:
 	output_string level_2,8,14,36,green
 	output_string level_3,6,16,37,green
 	output_string level_4,6,18,37,green
+	output_string instruction,19,20,30,yellow
 	call choose_level
 	
 	
@@ -216,8 +216,8 @@ create_obstacles proc
 	push dx
 	
 	;получить рандомное число в cx:dx
-	mov ah,0
-	int 1ah
+	;mov ah,0
+	;int 1ah
 	
 	mov cx,1
 draw:	
@@ -258,21 +258,13 @@ random proc
 	mov si,left_border
 	mov di,right_border
  
-	mov	dx, word [seed]
-	or	dx, dx
-	jnz	metka
+	;rdtsc
+	;чтение из счетчика тактов процесора
 	db 0fh, 31h
 	mov	dx, ax
-metka:	
-	mov	ax, word [seed2]
-	or	ax, ax
-	jnz	metka1
 	in	ax, 40h
-metka1:		
 	mul	dx
 	inc	ax
-	mov word [seed], dx
-	mov	word [seed2], ax
  
 	xor	dx, dx
 	sub	di, si
@@ -578,11 +570,14 @@ output_part endp
 end_game proc 
 	mov ax,0003h
 	int 10h
-	output_string game_over,9,10,35,red
+	mov position,1352
+	call output_all_time
+	output_string game_over,9,10,36,red
 	output_string level_1,6,12,37,green
 	output_string level_2,8,14,36,green
 	output_string level_3,6,16,37,green
 	output_string level_4,6,18,37,green
+	output_string instruction,19,20,30,yellow
 	call delay
 	call choose_level
 	mov left_border,40

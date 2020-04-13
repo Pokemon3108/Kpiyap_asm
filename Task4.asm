@@ -62,12 +62,6 @@ output_string macro string, len, row, column, color
 	pop es
 endm
 
-set_cursor macro row,column,page_number
-	mov dh,row	
-	mov dl,column
-	mov bh,page_number
-	
-endm
 
 output_symbol macro position,color
     push ax
@@ -86,8 +80,6 @@ start:
 	mov ax,@data
 	mov ds,ax
 	
-	;mov ah, 0ch 
-    ;int 21h 
 	call clear_keyboard_buffer
 	
 	;установка видеорежима
@@ -98,7 +90,6 @@ start:
 	output_string level_2,8,14,36,green
 	output_string level_3,6,16,37,green
 	output_string level_4,6,18,37,green
-	;set_cursor 20,40,0
 	call choose_level
 	
 	
@@ -173,6 +164,7 @@ cycle_game_start:
 ret
 game_start endp
 
+
 draw_car proc
 	
 	mov al,green
@@ -185,38 +177,15 @@ draw_car proc
     
 	mov al,219
 	cmp es:[bx],al
-	je end_game
-	
-	mov bx,car_current_position
-	cmp es:[bx+2],al
-	je end_game
-	cmp es:[bx-2],al
-	je end_game
-	
+	je game_end_call
 	ret
 	
-end_game:
-	
-	mov ax,0003h
-	int 10h
-	output_string game_over,9,10,35,red
-	output_string level_1,6,12,37,green
-	output_string level_2,8,14,36,green
-	output_string level_3,6,16,37,green
-	output_string level_4,6,18,37,green
-	call delay
-	call choose_level
-	mov left_border,40
-	mov right_border,120
-	mov car_current_position,3760
-	mov hours,0
-	mov minutes,0
-	mov seconds,0
-	mov cx,25
-	jmp pre_game_borders
+game_end_call:
+	call end_game
 	ret
 	
 draw_car endp
+
 
 delay proc
 	push cx
@@ -238,6 +207,7 @@ cycle:
 	pop cx
 ret	
 delay endp
+
 
 create_obstacles proc
 	push cx
@@ -278,54 +248,9 @@ draw_obstacle proc
 
 ret
 draw_obstacle endp
+
 	
 random proc
-	; push cx
-	; push bx
-	; mov ax,dx
-    ; mov cx,8
-; newbit:
-    ; mov bx,ax
-    ; and bx,002Dh
-    ; xor bh,bl
-    ; clc
-    ; jpe shift
-    ; stc
-; shift:
-    ; rcr ax,1
-    ; loop newbit
- 
-    ; pop bx
-	; pop cx
-    
-	; push cx
-	; mov al,dl
-	; mov dl,45
-	; mul dl
-	; add al,21
-	; mov dl,right_border
-	; div dl
-	; ;остаток в ah
-	
-	
-	; cmp ah,left_border
-	; jg not_shift_obstacle
-	; add ah,left_border
-
-; not_shift_obstacle:	
-	
-	
-	; test ah,1
-	; jz two
-; not_two:
-	
-	; inc ah
-	
-; two:	
-	; mov dl,ah
-	; mov rand,ah
-	; pop cx
-	
 	
 	push	cx
 	push	dx
@@ -368,41 +293,7 @@ two:
 	pop	dx
 	pop	cx
 	ret
-	
-	; push cx
-    ; ;(time+prev_rand)*17+13
-    ; ;push ax
-    ; push bx
-    ; mov ax, 0
-    ; int 1ah
-    ; mov ax, dx
-    ; mov ah, 0
-    ; mov bx, 100
-    ; xor dx, dx
-    ; idiv bl
-    ; mov ax, dx
-    ; mov ah, 0
-    ; add ax, rand
-    ; mov bl, 17
-    ; mul bl
-    ; add ax, 13
-	; test ax,1
-	; jpo not_two
-	; jpe two
-	
-; not_two:
-	; inc ax
 
-; two:	
-	
-    ; mov rand, ax
-    ; clc
-    ; pop bx
-    ; ;pop ax 
-    ; pop cx
-    ; ret
-	
-   ret
 random endp
 
 
@@ -426,21 +317,35 @@ scroll proc
 ret
 scroll endp
 
+
 get_key proc
+	
 	in al,60h
 	cmp al,75; left
 	je go_left
+	
 	cmp al,77 ;right
 	jne flush
+	mov al,219
+	cmp es:[bx+2],al
+	je end_game_call
 	add car_current_position,2
 	jmp flush
 	
 	
 go_left:
+	mov bx,car_current_position
+	mov al,219
+	cmp es:[bx-2],al
+	je end_game_call
+	
 	sub car_current_position,2
 
 flush:	
 	call clear_keyboard_buffer
+	ret
+end_game_call:
+	call end_game
 	
 ret
 get_key endp	
@@ -669,30 +574,27 @@ output_part proc
     ret
 output_part endp
 
+
+end_game proc 
+	mov ax,0003h
+	int 10h
+	output_string game_over,9,10,35,red
+	output_string level_1,6,12,37,green
+	output_string level_2,8,14,36,green
+	output_string level_3,6,16,37,green
+	output_string level_4,6,18,37,green
+	call delay
+	call choose_level
+	mov left_border,40
+	mov right_border,120
+	mov car_current_position,3760
+	mov hours,0
+	mov minutes,0
+	mov seconds,0
+	mov cx,25
+	jmp pre_game_borders
+	
+	ret
+end_game endp
+
 end start
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

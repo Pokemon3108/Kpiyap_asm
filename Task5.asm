@@ -4,17 +4,24 @@
 .data   
 
 ;buffer db 'helloworld jok hello', 0     
-buffer db 40 dup(0)
-file_buffer db 40 dup (0)
-buf_len equ 20 
-len dw 20
-cut dw 20
-old_word db 'hello'  
-old_word_len equ 5
+buffer db 1000 dup(0)
+max equ 1000
+file_buffer db 1000 dup (0)
+buf_len dw 500 
+len dw 500
+
+cur_pos dw 0
+cur_pos_h dw 0
+read_len dw 0
+left_border dw 0
+left_border_h dw 0
+
+old_word db 'amet'  
+old_word_len equ 4
 new_word db 'pop' 
 new_word_len equ 3 
-temp dw '0' 
-read_len dw 20
+ 
+
 
 file_end db 0
 
@@ -27,14 +34,10 @@ word_end dw 0
 
 dif dw 0
 
-filename db 'C:\emu8086\vdrive\C\lab5.txt', 0
+filename db 'lab5.txt', 0
 file_id dw 0
 
-file_len dw 0 
-file_len_h dw 0 
-
-cur_pos dw 5
-cur_pos_h dw 0 
+file_len dw 0
 
 pos_read dw 0
 row db 0
@@ -43,9 +46,8 @@ row db 0
 invitation_for_input db "Input word",10,13, '$'
 open_error db "File wasn't opened",10,13, '$' 
 
-   
-             
 .code 
+
 
 string_output macro str
    mov dx,offset str
@@ -64,101 +66,74 @@ set_cur_pos macro offset_h, offset_l, flag
    mov al, flag
    mov ah,42h
    mov bx,file_id
-   int 21h 
+   int 21h
    
    mov cur_pos, ax
+   mov cur_pos_h, dx 
+   
    pop dx
    pop cx 
    pop bx
    pop ax
 endm
 
+sub_big macro num
+	mov cx, num
+sub_loop:
+	dec file_len
+	loop sub_loop
+endm
+
+add_big macro num
+	mov cx, num
+add_loop:
+	inc file_len
+	loop add_loop
+endm
+
 start:
     mov ax,@data
     mov ds,ax
     mov es,ax
-   
-   ;string_output invitation_for_input
-;    mov dx,offset word
-;    mov ah,0ah
-;    int 21h
-;    mov al,word+1
-;    mov word_len, al
-
-    
-   
-    call open_file
-   
-     
-start_file:
-    call get_cur_pos     
-    mov ax, cur_pos
-    mov shift_pos, ax
-    call read_file ;cur_pos=20
-    
-    
-    ;call get_cur_pos
-    call cut_buffer 
-    call buffer_len_proc
-    
-    
-    mov ax, len
-    mov cut, ax
-    
-    
-    call change_word  
-    
-    
-    mov ax, cur_pos
-    sub ax, read_len
-    add ax, len
-    mov cur_pos, ax
-    
-    
-    push cur_pos
-    sub ax, len
-    mov cur_pos, ax 
-   
-    mov ax, old_word_len
-    mov bx, new_word_len
-    cmp bx, ax
-    jge new_bigger
-     
-    mov ax, read_len 
-    cmp len, ax
-    je write
-     
-    mov ax, cut
-    sub ax, len
-    mov shift, ax
-    call shift_left_proc
-    
-    jmp write
-   
-new_bigger: 
-    mov ax, len
-    sub ax, read_len  
-    mov shift, ax
-    call shift_right_proc   
-   
-write:    
-    ;call get_cur_pos 
-    pop cur_pos
-    set_cur_pos 0, shift_pos, 0
-    call write_to_file
-   
-    
-    cmp file_end, 1
-    je end_program
-	jmp start_file
 	
-end_program:   
-    call close_file  
-      
-        
-    mov ah,4ch
+	
+	call open_file
+	call get_file_len
+	
+program_loop: 
+    set_cur_pos 0,0,0 
+    call zero_buffer
+	call read_file
+	call cut_buffer
+	mov ax, shift
+	;sub_big shift
+	sub file_len, ax
+	call change_word
+	;set_cur_pos 0,shift,0
+	call shift_left_proc
+	
+	
+	set_cur_pos 0,0,2
+	call buffer_len_proc
+	call write_to_file 
+	
+	mov ax, buf_len
+	cmp file_len, ax
+	jg program_loop
+	
+	mov ax, file_len
+	mov buf_len, ax 
+	
+	cmp file_len, 0
+	jg program_loop
+	
+	
+	call close_file
+	
+	mov ah,4ch
     int 21h
-   
+	
+
 
 open_file proc   
     push dx
@@ -197,14 +172,10 @@ read_file proc
 	lea dx, buffer
 	int 21h  
 	
-	mov read_len, ax
-	add cur_pos, ax
-   
-	cmp ax,buf_len
+	mov len, ax
+	cmp ax, buf_len
 	je read_file_end
 	mov file_end,1
-	mov len, ax
-   
 
 read_file_end:        
 	pop dx
@@ -213,9 +184,45 @@ read_file_end:
 	pop ax 
    
 	ret
-read_file endp  
-          
-          
+read_file endp
+
+	
+get_cur_pos proc
+	push ax
+	push bx
+	push cx
+	push dx
+	
+	mov al,1
+	mov bx, file_id
+	mov cx,0
+	mov dx,0
+	mov ah,42h
+	int 21h
+	
+	mov cur_pos_h, dx
+	mov cur_pos, ax
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	ret
+get_cur_pos endp	
+
+
+close_file proc   
+	push bx
+	push ax
+   
+	mov ah,3eh
+	mov bx,file_id
+	int 21h 
+   
+	pop ax
+	pop bx
+	ret
+close_file endp
+
 write_to_file proc
 	push ax
 	push bx
@@ -240,180 +247,63 @@ write_to_file proc
 write_to_file endp
 
 
+get_file_len proc
+	push ax
+	set_cur_pos 0,0,2
+	call get_cur_pos
+	
+	;mov ax, cur_pos_h
+	;mov file_len, ax
+	;shl file_len, 16
+	mov ax, cur_pos
+	;add_big ax
+	add file_len, ax
+	
+	set_cur_pos 0,0,0
+	pop ax
+	ret
+get_file_len endp	
 
-shift_left_proc proc
-    call copy_buffers
-    push cur_pos
-    
+
+cut_buffer proc
     push ax
     push cx
-    push bx 
+    push di
     
-    mov  ax, shift_pos
-    push shift
-    add shift, ax
-    set_cur_pos 0,shift,0 
-    pop shift
-shift_left:
+    mov ax, max
+    shr ax, 1
+    cmp len, ax
+    jl set_shift
+    
+    std
+    mov ax, ' '
+    lea di, buffer 
+    add di, len
+    mov cx, len
+    repne scasb
+   
+    
+	mov shift, cx
+	add shift, 2
+	
+    xchg len,cx
+    sub cx,len
+zero:    
+    mov buffer[di+2], 0 
+    inc di
+    loop zero 
+    jmp end_cut
 
-	call read_file
-    
-    push len
-    push read_len
-    
-    neg read_len
-    mov ax, shift
-    sub read_len,ax
- 
-continue_shift:
-	set_cur_pos 0ffffh, read_len, 1
-    
-    pop read_len 
-    mov ax, read_len
-    mov len,ax
-	call write_to_file
+set_shift:    
+    mov ax, len
+    mov shift, ax
 	
-	pop len  
-	
-	
-	set_cur_pos  0,shift,1
-   
-	cmp file_end ,1
-	jne shift_left
-   
-	;обрезка файла  
-	push shift
-	neg shift
-	mov ah,40h
-	mov bx, file_id
-	mov cx,0
-	set_cur_pos 0ffffh,shift,2  
-	pop shift
-	int 21h
-	mov file_end, 0
-    
-    call copy_buffers
-    pop bx
+end_cut:	
+    pop di
     pop cx
     pop ax
-    pop cur_pos
-	ret
-shift_left_proc endp    
-
-
-shift_right_proc proc 
-    call copy_buffers
-    push cur_pos
-	set_cur_pos 0,0,2
-	push len
-	push ax   
-	push bx
-	
-	
-shift_right:
-	mov ax, cur_pos 
-	mov bx, cur_pos
-	sub bx, shift_pos
-	cmp bx, len
-	
-	;cmp ax, len
-	jge continue_loop
-	mov len, bx
-
-continue_loop:
-	push len
-	neg len
-	set_cur_pos 0ffffh, len,1
-	pop len
-	call read_file
-
-	
-	push len
-	
-	mov ax, shift
-	cmp len,ax
-	jg greater
-	 
-	set_cur_pos 0, shift ,0
-
-	call write_to_file
-	pop len
-	jmp end_shift_right
-	
-greater:
-    push len	
-	neg len 
-	mov ax, shift
-	add len,ax
-	;-3=2-5
-	
-	set_cur_pos  0ffffh,len,1  
-	pop len
-	call write_to_file
-	
-	
-	push len 
-	mov ax, shift
-	add len,ax
-	neg len
-	set_cur_pos 0ffffh, len, 1
-	pop len
-	
-	
-	call get_cur_pos    
-	mov ax, shift_pos
-	cmp cur_pos, ax
-	je end_shift_right
-	
-	jmp shift_right
-
-	
-end_shift_right:
-    call copy_buffers 
-    pop bx
-	pop ax	
-	pop len  
-	pop cur_pos
-	ret
-shift_right_proc endp
-
-
-get_cur_pos proc
-	push ax
-	push bx
-	push cx
-	push dx
-	
-	mov al,1
-	mov bx, file_id
-	mov cx,0
-	mov dx,0
-	mov ah,42h
-	int 21h
-	
-	mov cur_pos, ax
-	pop dx
-	pop cx
-	pop bx
-	pop ax
-	ret
-get_cur_pos endp	
-
-
-close_file proc   
-	push bx
-	push ax
-   
-	mov ah,3eh
-	mov bx,file_id
-	int 21h 
-   
-	pop ax
-	pop bx
-	ret
-close_file endp
-
-
+    ret
+cut_buffer endp 
 
 
 change_word proc
@@ -427,7 +317,7 @@ change_word proc
     call buffer_len_proc
    
     mov ax,len
-
+    mov word_end, 0
 start_cycle: 
     
     cld 
@@ -461,11 +351,6 @@ continue_search:
     repe cmpsb
     jz was_found 
     
-   ; mov bx, len-1
-;    sub bx,cx  
-;    pop cx
-;    sub cx,bx
-;    mov cx,remain
     
     jmp start_cycle
     
@@ -533,10 +418,9 @@ end_change_word:
 	pop cx 
 	
 	ret
-change_word endp	
- 
- 
-  
+change_word endp
+
+
 reverse proc
     push si
 	push di
@@ -559,7 +443,89 @@ end_reverse:
 	pop di
 	pop si    
 	ret
-reverse endp   
+reverse endp
+
+
+; shift_left_proc proc 
+    ; call copy_buffers
+	; push si
+	; set_cur_pos 0, shift, 0
+	
+; shift_left:	
+	; call read_file
+	
+	; mov si, len
+	; add si, shift
+	; neg si
+	; set_cur_pos 0ffffh, si, 1
+	; call write_to_file
+	
+	; set_cur_pos 0, shift, 1
+	; cmp file_end, 1
+	; jne shift_left
+	
+	; mov si, shift
+	; neg si
+	; set_cur_pos 0ffffh,si,2  
+	; xor ax, ax
+	; mov ah,40h
+	; mov bx, file_id
+	; mov cx,0
+	; int 21h
+	
+	; call copy_buffers
+	; pop si
+	; ret
+; shift_left_proc endp
+
+shift_left_proc proc
+    call copy_buffers
+    
+    
+    push si
+    push ax
+    push cx
+    push bx
+    
+    set_cur_pos 0,shift,0 
+    
+shift_left:
+    push len
+	call read_file
+   
+   
+    mov si, shift
+	add si, len
+	neg si
+	set_cur_pos 0ffffh, si, 1
+    
+	call write_to_file
+	
+	pop len
+	set_cur_pos  0,len,1
+   
+	cmp file_end ,1
+	jne shift_left
+   
+	;обрезка файла  
+	push shift
+	neg shift
+	mov ah,40h
+	mov bx, file_id
+	mov cx,0
+	set_cur_pos 0ffffh,shift,2  
+	pop shift
+	int 21h
+	mov file_end, 0
+    
+    call copy_buffers 
+    pop si
+    pop bx
+    pop cx
+    pop ax
+   
+	ret
+shift_left_proc endp 
 
 
 buffer_len_proc proc 
@@ -580,32 +546,6 @@ len_cycle:
     pop ax    
     ret
 buffer_len_proc endp
-
-
-cut_buffer proc
-    push ax
-    push cx
-    push di
-    
-    std
-    mov ax, ' '
-    lea di, buffer 
-    add di, len
-    mov cx, len
-    repne scasb
-    
-    xchg len,cx
-    sub cx,len
-zero:    
-    mov buffer[di+2], 0 
-    inc di
-    loop zero
-    
-    pop di
-    pop cx
-    pop ax
-    ret
-cut_buffer endp    
 
 
 copy_buffers proc 
@@ -631,6 +571,23 @@ copy:
     pop cx
     ret
 copy_buffers  endp 
- 
-end start 
 
+
+zero_buffer proc 
+    push cx
+    push si
+    mov cx, max
+    xor si, si  
+    
+zero_loop:
+    mov buffer[si], 0
+    inc si
+    loop zero_loop
+    
+   
+    pop si  
+    pop cx
+    ret
+zero_buffer endp    
+
+end start	

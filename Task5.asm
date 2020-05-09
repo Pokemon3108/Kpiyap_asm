@@ -4,11 +4,11 @@
 .data   
 
 ;buffer db 'helloworld jok hello', 0     
-buffer db 1000 dup(0)
-max equ 1000
-file_buffer db 1000 dup (0)
-buf_len dw 500 
-len dw 500
+buffer db 500 dup(0)
+max equ 500
+file_buffer db 500 dup (0)
+buf_len dw 250
+len dw 250
 
 cur_pos dw 0
 cur_pos_h dw 0
@@ -19,7 +19,7 @@ left_border_h dw 0
 old_word db 'amet'  
 old_word_len equ 4
 new_word db 'pop' 
-new_word_len equ 3 
+new_word_len equ 3
  
 
 
@@ -99,8 +99,10 @@ start:
 	
 	call open_file
 	call get_file_len
-	
+
+;mov cx,2	
 program_loop: 
+;push cx
     set_cur_pos 0,0,0 
     call zero_buffer
 	call read_file
@@ -108,14 +110,26 @@ program_loop:
 	mov ax, shift
 	;sub_big shift
 	sub file_len, ax
+	call shift_left_proc
+	
 	call change_word
 	;set_cur_pos 0,shift,0
-	call shift_left_proc
+	
+	
+	
+	
+	;cmp cx, 1
+	;je end_program
 	
 	
 	set_cur_pos 0,0,2
 	call buffer_len_proc
+	
+	
+	
 	call write_to_file 
+	
+	
 	
 	mov ax, buf_len
 	cmp file_len, ax
@@ -126,8 +140,10 @@ program_loop:
 	
 	cmp file_len, 0
 	jg program_loop
-	
-	
+	;pop cx
+	;loop program_loop
+
+end_program:	
 	call close_file
 	
 	mov ah,4ch

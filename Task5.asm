@@ -4,11 +4,11 @@
 .data   
 
 ;buffer db 'helloworld jok hello', 0     
-buffer db 500 dup(0)
-max equ 500
-file_buffer db 500 dup (0)
-buf_len dw 250
-len dw 250
+buffer db 2000 dup(0)
+max equ 2000
+file_buffer db 2000 dup (0)
+buf_len dw 1000
+len dw 1000
 
 cur_pos dw 0
 cur_pos_h dw 0
@@ -18,16 +18,13 @@ left_border_h dw 0
 
 old_word db 'amet'  
 old_word_len equ 4
-new_word db 'pop' 
-new_word_len equ 3
+new_word db 'qwerty' 
+new_word_len equ 6
  
 
-
 file_end db 0
-
 shift dw 0
 
-shift_pos dw 0
 
 word_start dw 0
 word_end dw 0   
@@ -38,9 +35,7 @@ filename db 'lab5.txt', 0
 file_id dw 0
 
 file_len dw 0
-
-pos_read dw 0
-row db 0
+file_len_h dw 0
 
 ;пока не нужно
 invitation_for_input db "Input word",10,13, '$'
@@ -77,19 +72,16 @@ set_cur_pos macro offset_h, offset_l, flag
    pop ax
 endm
 
-sub_big macro num
-	mov cx, num
-sub_loop:
-	dec file_len
-	loop sub_loop
+sub_big_macro macro num
+	mov ax, num
+	call sub_big
 endm
 
-add_big macro num
-	mov cx, num
-add_loop:
-	inc file_len
-	loop add_loop
-endm
+; add_big_macro macro num
+	; mov ax, num
+	; call add_big
+	
+; endm
 
 start:
     mov ax,@data
@@ -99,49 +91,38 @@ start:
 	
 	call open_file
 	call get_file_len
-
-;mov cx,2	
+	
 program_loop: 
-;push cx
+
     set_cur_pos 0,0,0 
     call zero_buffer
 	call read_file
 	call cut_buffer
-	mov ax, shift
-	;sub_big shift
-	sub file_len, ax
+	
+	sub_big_macro shift
+	
 	call shift_left_proc
 	
 	call change_word
-	;set_cur_pos 0,shift,0
-	
-	
-	
-	
-	;cmp cx, 1
-	;je end_program
-	
 	
 	set_cur_pos 0,0,2
 	call buffer_len_proc
-	
-	
-	
 	call write_to_file 
 	
-	
+	cmp file_len_h, 0
+	jne program_loop
 	
 	mov ax, buf_len
 	cmp file_len, ax
-	jg program_loop
+	ja program_loop
 	
 	mov ax, file_len
 	mov buf_len, ax 
 	
+	
 	cmp file_len, 0
-	jg program_loop
-	;pop cx
-	;loop program_loop
+	jne program_loop
+	
 
 end_program:	
 	call close_file
@@ -265,17 +246,20 @@ write_to_file endp
 
 get_file_len proc
 	push ax
+	push bx
 	set_cur_pos 0,0,2
 	call get_cur_pos
 	
-	;mov ax, cur_pos_h
-	;mov file_len, ax
-	;shl file_len, 16
+	
 	mov ax, cur_pos
-	;add_big ax
-	add file_len, ax
+	mov bx, cur_pos_h
+	
+	mov file_len, ax
+	mov file_len_h, bx
 	
 	set_cur_pos 0,0,0
+	
+	pop bx
 	pop ax
 	ret
 get_file_len endp	
@@ -361,7 +345,6 @@ continue_check:
     cmp buffer[di-2],' '
     jne start_cycle
     
-    ;push cx 
 continue_search:     
     mov cx, old_word_len-1
     repe cmpsb
@@ -462,37 +445,6 @@ end_reverse:
 reverse endp
 
 
-; shift_left_proc proc 
-    ; call copy_buffers
-	; push si
-	; set_cur_pos 0, shift, 0
-	
-; shift_left:	
-	; call read_file
-	
-	; mov si, len
-	; add si, shift
-	; neg si
-	; set_cur_pos 0ffffh, si, 1
-	; call write_to_file
-	
-	; set_cur_pos 0, shift, 1
-	; cmp file_end, 1
-	; jne shift_left
-	
-	; mov si, shift
-	; neg si
-	; set_cur_pos 0ffffh,si,2  
-	; xor ax, ax
-	; mov ah,40h
-	; mov bx, file_id
-	; mov cx,0
-	; int 21h
-	
-	; call copy_buffers
-	; pop si
-	; ret
-; shift_left_proc endp
 
 shift_left_proc proc
     call copy_buffers
@@ -600,10 +552,34 @@ zero_loop:
     inc si
     loop zero_loop
     
-   
     pop si  
     pop cx
     ret
 zero_buffer endp    
+
+
+sub_big proc
+	cmp file_len, ax
+	jb len_smaller
+	sub file_len,ax
+	jmp end_sub
+	
+len_smaller:
+	cmp file_len_h, 0
+	jne file_len_h_greater
+	mov file_len,0
+	jmp end_sub
+	
+file_len_h_greater:
+	dec file_len_h
+	
+	sub ax, file_len
+	mov file_len, 0ffffh
+	sub file_len, ax
+	inc file_len
+	
+end_sub:	
+	ret
+sub_big endp
 
 end start	

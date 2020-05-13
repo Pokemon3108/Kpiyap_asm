@@ -2,8 +2,7 @@
 .stack 100h
 
 .data   
-
-;buffer db 'helloworld jok hello', 0     
+   
 buffer db 2000 dup(0)
 max equ 2000
 file_buffer db 2000 dup (0)
@@ -12,34 +11,34 @@ len dw 1000
 
 cur_pos dw 0
 cur_pos_h dw 0
-read_len dw 0
-left_border dw 0
-left_border_h dw 0
 
-old_word db 'amet'  
-old_word_len equ 4
-new_word db 'qwerty' 
-new_word_len equ 6
+new_word db 51 dup (0)
+old_word db 51 dup (0)
+old_word_len dw 0
+new_word_len dw 0
  
-
 file_end db 0
 shift dw 0
 
+cmd_size db 0
+cmd_text db 128 dup (0)
+cmd_error_text db "You should pass 3 arguments in cmd. Try again",10,13,'$'
+
+file_name db 50 dup (0)
+file_id dw 0
+file_len dw 0
+file_len_h dw 0
 
 word_start dw 0
 word_end dw 0   
 
 dif dw 0
 
-filename db 'lab5.txt', 0
-file_id dw 0
+marks db ',.!',0
+marks_number dw 3
 
-file_len dw 0
-file_len_h dw 0
-
-;пока не нужно
-invitation_for_input db "Input word",10,13, '$'
 open_error db "File wasn't opened",10,13, '$' 
+close_error db "File can't be closed",10,13,'$'
 
 .code 
 
@@ -73,20 +72,31 @@ set_cur_pos macro offset_h, offset_l, flag
 endm
 
 sub_big_macro macro num
+	push ax
 	mov ax, num
 	call sub_big
+	pop ax
 endm
 
-; add_big_macro macro num
-	; mov ax, num
-	; call add_big
-	
-; endm
 
 start:
-    mov ax,@data
-    mov ds,ax
-    mov es,ax
+    mov ax, @data
+	mov es,ax
+	
+	xor cx,cx
+	
+	mov cl, ds:[80h]
+	
+	dec cl
+	mov cmd_size, cl
+	
+	mov si, 82h
+	lea di, cmd_text
+	rep movsb
+	
+	mov ds,ax
+	
+	call parse_cmd 
 	
 	
 	call open_file
@@ -126,16 +136,95 @@ program_loop:
 
 end_program:	
 	call close_file
-	
+
+exit:	
 	mov ah,4ch
     int 21h
 	
+	
+parse_cmd proc
+	push di
+	push si
+	push cx
+	push bx
+	
+	xor ch,ch
+	mov cl, cmd_size
+	lea si, cmd_text
+	
+	lea di, file_name
+	call get_str_from_cmd 
+	cmp file_name,0
+	je cmd_error
+	
+	lea di, old_word 
+	call get_str_from_cmd
+	mov old_word_len, bx
+	cmp old_word,0
+	je cmd_error
 
+	
+	lea di, new_word
+	call get_str_from_cmd
+	mov new_word_len, bx
+	cmp new_word,0
+	je cmd_error
+
+	cmp ds:[si], 0
+    jne cmd_error
+end_parse:	
+    pop bx
+	pop cx
+	pop si
+	pop di
+	ret
+	
+cmd_error:
+	string_output cmd_error_text
+	jmp exit
+	
+parse_cmd endp
+
+get_str_from_cmd proc
+	push cx
+	push ax
+	push di
+	
+	mov bx,si
+	
+find_stop_symbol:	
+	mov al, ds:[si]
+	
+	cmp al, ' '
+	je found_stop_symbol
+	
+	cmp al, 0
+	je found_stop_symbol
+	
+	mov es:[di], al
+	inc di
+	inc si
+	loop find_stop_symbol
+	
+found_stop_symbol:
+	mov al,0
+	mov [di],al
+	inc si
+	
+	sub bx,si
+	neg bx 
+	dec bx
+	
+	pop di
+	pop ax
+	pop cx
+	ret
+get_str_from_cmd endp
 
 open_file proc   
     push dx
     push ax
-    lea dx,filename
+    lea dx,file_name
     mov ah,3dh
     mov al,2 ;for read and write
     int 21h  
@@ -144,12 +233,12 @@ open_file proc
      
 error:      
 	string_output open_error 
-	jmp return 
+	jmp exit 
    
 get_file_id:      
 	mov file_id,ax             
    
-return:
+  
 	pop ax
 	pop dx        
 	ret
@@ -215,6 +304,9 @@ close_file proc
 	mov bx,file_id
 	int 21h 
    
+	jnb end_close
+	string_output close_error
+end_close:	
 	pop ax
 	pop bx
 	ret
@@ -231,9 +323,6 @@ write_to_file proc
 	mov cx,len
 	lea dx, buffer
 	int 21h  
-                   
-                   
-    add cur_pos, ax
 
 	pop dx
 	pop cx
@@ -249,7 +338,6 @@ get_file_len proc
 	push bx
 	set_cur_pos 0,0,2
 	call get_cur_pos
-	
 	
 	mov ax, cur_pos
 	mov bx, cur_pos_h
@@ -311,9 +399,11 @@ change_word proc
     push di
     push si
     push ax
-     
-    mov dif, new_word_len  
-    sub dif, old_word_len 
+    
+	
+    mov ax, new_word_len  
+    sub ax, old_word_len 
+	mov dif,ax
     call buffer_len_proc
    
     mov ax,len
@@ -343,16 +433,23 @@ continue_check:
     je continue_search
     
     cmp buffer[di-2],' '
+    je continue_search
+	
+	cmp buffer[di-2],9
+    je continue_search
+	
+	cmp buffer[di-2],10
+    je continue_search
+	
+	cmp buffer[di-2],13
     jne start_cycle
     
 continue_search:     
-    mov cx, old_word_len-1
+    mov cx, old_word_len
+    dec cx 
     repe cmpsb
     jz was_found 
-    
-    
     jmp start_cycle
-    
     
 was_found:
     mov word_end, di	
@@ -363,8 +460,27 @@ was_found:
     cmp buffer[di],13
     je change
     
+	cmp buffer[di], 9
+	je change
+	
+	cmp buffer[di],10
+	je change
+	
+	lea si, marks
+	mov cx, marks_number
+check_marks:
+	mov al, ds:[si]
+	cmp buffer[di], al
+	je change
+	inc si
+	loop check_marks
+	jnz continue_cmp
+	jmp start_cycle
+	
+continue_cmp:	
     cmp buffer[di],0
-    jne start_cycle
+    je change
+	jmp start_cycle
 
 change:	
     call buffer_len_proc
@@ -445,10 +561,8 @@ end_reverse:
 reverse endp
 
 
-
 shift_left_proc proc
     call copy_buffers
-    
     
     push si
     push ax

@@ -39,6 +39,7 @@ marks_number dw 3
 
 open_error db "File wasn't opened",10,13, '$' 
 close_error db "File can't be closed",10,13,'$'
+len_error db "Word length should be less than 50 symbols", 10,13,'$'
 
 .code 
 
@@ -162,6 +163,8 @@ parse_cmd proc
 	mov old_word_len, bx
 	cmp old_word,0
 	je cmd_error
+	cmp old_word_len, 50
+	jg len_word_error
 
 	
 	lea di, new_word
@@ -169,6 +172,8 @@ parse_cmd proc
 	mov new_word_len, bx
 	cmp new_word,0
 	je cmd_error
+	cmp new_word_len,50
+	jg len_word_error
 
 	cmp ds:[si], 0
     jne cmd_error
@@ -181,6 +186,10 @@ end_parse:
 	
 cmd_error:
 	string_output cmd_error_text
+	jmp exit
+	
+len_word_error:
+	string_output len_error
 	jmp exit
 	
 parse_cmd endp
@@ -238,7 +247,6 @@ error:
 get_file_id:      
 	mov file_id,ax             
    
-  
 	pop ax
 	pop dx        
 	ret
@@ -623,7 +631,6 @@ len_cycle:
     sub di, offset buffer
     mov len,di 
     
-     
     pop di
     pop ax    
     ret
@@ -657,16 +664,16 @@ copy_buffers  endp
 
 zero_buffer proc 
     push cx
-    push si
-    mov cx, max
-    xor si, si  
+	push ax
+	push di
     
-zero_loop:
-    mov buffer[si], 0
-    inc si
-    loop zero_loop
+	mov al, 0
+	mov cx, max
+	lea di,  buffer
+	rep stosb
     
-    pop si  
+    pop di
+	pop ax
     pop cx
     ret
 zero_buffer endp    

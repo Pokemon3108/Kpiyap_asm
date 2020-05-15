@@ -41,6 +41,8 @@ open_error db "File wasn't opened",10,13, '$'
 close_error db "File can't be closed",10,13,'$'
 len_error db "Word length should be less than 50 symbols", 10,13,'$'
 
+program_start db "Start program",10,13,'$'
+
 .code 
 
 
@@ -99,6 +101,7 @@ start:
 	
 	call parse_cmd 
 	
+	string_output program_start
 	
 	call open_file
 	call get_file_len
@@ -153,16 +156,25 @@ parse_cmd proc
 	mov cl, cmd_size
 	lea si, cmd_text
 	
+	dec si
+skip_shifts_start:
+	inc si
+	cmp ds:[si], byte ptr ' '
+	je skip_shifts_start
+
+	
 	lea di, file_name
 	call get_str_from_cmd 
 	cmp file_name,0
 	je cmd_error
+	
 	
 	lea di, old_word 
 	call get_str_from_cmd
 	mov old_word_len, bx
 	cmp old_word,0
 	je cmd_error
+	;jmp exit
 	cmp old_word_len, 50
 	jg len_word_error
 
@@ -223,7 +235,15 @@ found_stop_symbol:
 	sub bx,si
 	neg bx 
 	dec bx
-	
+
+skip_shifts:	
+	;mov al, ' '
+	cmp ds:[si], byte ptr ' '
+	jne end_get_str
+	inc si
+	jmp skip_shifts
+
+end_get_str:	
 	pop di
 	pop ax
 	pop cx

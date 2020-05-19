@@ -112,7 +112,9 @@ continue_start:
 	mov bx,offset blockEPB
     mov ax,ds
     mov word ptr[blockEPB+4],ax
-    
+	mov ax,cs
+    mov word ptr[blockEPB+8],ax
+    mov word ptr[blockEPB+12],ax
  
 	mov ax, 4b00h
 	lea dx, path

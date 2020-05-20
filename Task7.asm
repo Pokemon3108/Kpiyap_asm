@@ -2,41 +2,37 @@
 .stack 100h
  
 .data
-cmd_error_text db "You should pass 1 argument to cmd", 10,13,'$' 
+ 
  
 blockEPB dw 0
 	cmd_offset dw offset cmd, 0
 	fcb1 dw 005ch, 0
 	fcb2 dw 006ch, 0
  
-	cmd db 12,' '
+	cmd db 10,' '
 	cmd_text db 125 dup (0), '$'
  
 EPBlen dw $-blockEPB
  
-max_len dw 3 
 path db "lab7.exe",0   
 delim db 10,13,'$'
-
-copies db 5 dup(0), '$'
+number_str db 126 dup (0), '$'
 realloc_error_text db "Realloc error",10,13,'$'
 copy_text db "Program copy: ", '$'
-
+cmd_error_text db "You should pass 1 argument to cmd", 10,13,'$'
+start_program db "Start program. ",'$'
+end_program db "End program. ",'$'
 number db 0
-  
+max_len dw 5   
 base dw 10
 len db 0
-cmd_max equ 10
-cmd_size db 0
+copies db 5 dup(0), '$'
+previous_copy db 5 dup (0), '$'
 new_program_symbol db 1
-not_number_text db "Input is not a number",10,13,'$'
+cmd_max equ 10 
 big_number_text db "Number is great than 255",10,13,'$' 
- 
-number_str db 126 dup (0), '$'
-data_segment_size = $ - cmd_error_text
-str_max equ 126
-
- 
+not_number_text db "Input is not a number",10,13,'$'
+data_segment_size = $ - blockEPB
 .code
  
 string_output macro str
@@ -69,9 +65,7 @@ continue_start:
  
 	mov cl, ds:[80h]
 	dec cl
-	mov cmd_size, cl
-	
-	
+ 
 	push cx
 	mov si, 82h
 	lea di, cmd_text
@@ -81,20 +75,28 @@ continue_start:
 	mov ax, @data
     mov ds, ax
  
- 
 	call parse_cmd
- 
+	
+	string_output start_program
 	string_output copy_text
 	string_output copies
 	string_output delim
 	
+	lea di, copies
+	call strlen
+	lea si, copies
+	lea di, previous_copy
+	mov cl,len
+	xor ch,ch
+	rep movsb
+	
+	
 	lea di, number_str
 	call atoi
-	
-	
 	cmp number, 0
-	je exit
-	
+	jne continue_start_1
+	jmp copy_output
+continue_start_1:	
 	dec number
  
 	lea di, number_str
@@ -105,14 +107,14 @@ continue_start:
 	inc number
 	lea di, copies
 	call itoa
- 
- 
+	
 	call create_new_cmd
+ 
  
 	mov bx,offset blockEPB
     mov ax,ds
     mov word ptr[blockEPB+4],ax
-	mov ax,cs
+    mov ax,cs
     mov word ptr[blockEPB+8],ax
     mov word ptr[blockEPB+12],ax
  
@@ -120,18 +122,23 @@ continue_start:
 	lea dx, path
 	lea bx, blockEPB
 	int 21h
- 
+
+copy_output: 
+	string_output end_program
+	string_output copy_text
+	string_output previous_copy
+	string_output delim
  
 	jmp exit
  
 realloc_error:
 	string_output realloc_error_text 
-
-
+ 
 exit:
 	mov ah,4ch
 	int 21h
  
+
 parse_cmd proc
 	push cx
 	push si
@@ -177,7 +184,7 @@ end_parse:
 cmd_error:
 	string_output cmd_error_text
 	jmp exit
-parse_cmd endp 
+parse_cmd endp
  
  
 get_number proc
@@ -322,10 +329,10 @@ strlen proc
  
  
 	mov al, 0
-	mov cx,str_max
+	mov cx,max_len
 	repne scasb
  
-	mov bx, str_max
+	mov bx, max_len
 	sub bx, cx 
 	dec bx
 	mov len, bl
@@ -341,7 +348,6 @@ zero_str proc
     push ax
     push di
  
-	xor ch,ch
     mov cx, max_len
     mov al, 0   
     rep stosb 
@@ -373,15 +379,18 @@ reverse_m:
 	ret
 reverse endp
  
-create_new_cmd proc
+ 
+ create_new_cmd proc
 	push di
 	push cx
 	push si
 	xor ch,ch 
  
+	xor ch,ch
 	lea di, cmd_text
 	push max_len
-	mov max_len, cmd_max
+	mov cl, cmd_max
+	mov max_len, cx
 	call zero_str
 	pop max_len
  
@@ -417,7 +426,5 @@ create_new_cmd proc
 	pop di
 	ret
 create_new_cmd endp
- 
 code_segment_size =$-start
 end start
-

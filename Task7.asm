@@ -10,11 +10,11 @@ blockEPB dw 0
 	fcb2 dw 006ch, 0
  
 	cmd db 10,' '
-	cmd_text db 125 dup (0), '$'
+	cmd_text db 125 dup (0), 0dh, '$'
  
 EPBlen dw $-blockEPB
  
-path db "lab7.exe",0   
+path db "task7.exe",0   
 delim db 10,13,'$'
 number_str db 126 dup (0), '$'
 realloc_error_text db "Realloc error",10,13,'$'
@@ -32,6 +32,7 @@ new_program_symbol db 1
 cmd_max equ 10 
 big_number_text db "Number is great than 255",10,13,'$' 
 not_number_text db "Input is not a number",10,13,'$'
+flag db 0
 data_segment_size = $ - blockEPB
 .code
  
@@ -77,6 +78,7 @@ continue_start:
  
 	call parse_cmd
 	
+	
 	string_output start_program
 	string_output copy_text
 	string_output copies
@@ -90,13 +92,19 @@ continue_start:
 	xor ch,ch
 	rep movsb
 	
+run_new_program:
 	
 	lea di, number_str
 	call atoi
 	cmp number, 0
 	jne continue_start_1
 	jmp copy_output
-continue_start_1:	
+	
+continue_start_1:
+	mov cl, number
+	xor ch,ch
+
+
 	dec number
  
 	lea di, number_str
@@ -109,8 +117,17 @@ continue_start_1:
 	call itoa
 	
 	call create_new_cmd
- 
- 
+	
+
+	
+	cmp flag, 1
+	je copy_output
+
+	
+	
+	
+	
+	
 	mov bx,offset blockEPB
     mov ax,ds
     mov word ptr[blockEPB+4],ax
@@ -122,6 +139,8 @@ continue_start_1:
 	lea dx, path
 	lea bx, blockEPB
 	int 21h
+	
+loop run_new_program	
 
 copy_output: 
 	string_output end_program
@@ -172,7 +191,7 @@ new_program_check:
 	mov al, new_program_symbol
 	cmp [si], al
 	jne cmd_error
-	
+	mov flag,1
 
 end_parse:	
 	pop ax

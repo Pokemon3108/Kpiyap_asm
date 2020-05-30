@@ -372,8 +372,6 @@ big_number_text db "Number is great than 255",10,13,'$'
 
 cmd_text db 127 dup (0)
 cmd_len db 0
-
-escape db "Press esc to turn off screensaver", 10, 13, '$'
 	
 end begin	
 

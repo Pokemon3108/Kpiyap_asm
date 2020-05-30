@@ -7,7 +7,7 @@ begin:
 	jmp start
 
 
-delay_sec dw 0
+delay_sec db 0
 ticks dw 0
 ticks_per_sec equ 182
 
@@ -221,6 +221,7 @@ start:
 	cmp al, es:[di]
 	je exit
 	
+	
 
 	cli
 	
@@ -245,9 +246,6 @@ exit:
 	mov ah, 4ch
 	int 21h
  
-outp:
-	string_output teststr
-	jmp exit
  
 string_output macro str
 	push dx
@@ -315,13 +313,14 @@ get_number:
 	sub al, '0'
 	inc si
 	
-	xchg ax, delay_sec
+	xor ah,ah
+	xchg al, delay_sec
 	mul base
-	cmp dx,0
+	cmp ah,0
     jne big_number
-	add ax, delay_sec
+	add al, delay_sec
 	jc big_number
-	xchg delay_sec,ax
+	xchg delay_sec,al
 	jmp get_number
 
 skip_shifts:	
@@ -349,10 +348,13 @@ get_ticks proc
 	push ax
 	push bx
 	
-	mov ax, delay_sec
+	xor ah,ah
+	xor bh,bh
+	
+	mov al, delay_sec
 	mov bx, ticks_per_sec
 	mul bx
-	mov bx,base
+	mov bl,base
 	div bx
 	mov ticks, ax
 	
@@ -363,10 +365,10 @@ get_ticks endp
 
 
 cmd_error_text db "You should pass 1 argument to cmd (not zero)", 10,13,'$'
-base dw 10
+base db 10
 
 not_number_text db "Input is not a number",10,13,'$'
-big_number_text db "Number is great than 65535",10,13,'$' 
+big_number_text db "Number is great than 255",10,13,'$' 
 
 cmd_text db 127 dup (0)
 cmd_len db 0
